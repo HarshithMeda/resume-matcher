@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /** The free, local matcher: dictionary skills + required/preferred detection + keyword overlap. */
@@ -31,7 +32,10 @@ public class RuleBasedMatchAnalyzer implements MatchAnalyzer {
     @Override
     public MatchResult analyze(String resumeText, String jobDescription) {
         List<JobSkill> jobSkills = classifier.classify(jobDescription);
-        Set<Skill> resumeSkills = new HashSet<>(dictionary.findIn(resumeText));
+        List<Skill> resumeFound = dictionary.findIn(resumeText);
+        Set<Skill> direct = new HashSet<>(resumeFound);
+        // Resume side only: "Spring Data JPA" on a resume also counts as JPA, Hibernate and Spring Framework.
+        Map<Skill, Skill> implied = dictionary.impliedBy(resumeFound);
 
         List<MatchedSkill> matched = new ArrayList<>();
         List<MissingSkill> missingRequired = new ArrayList<>();
@@ -49,11 +53,20 @@ public class RuleBasedMatchAnalyzer implements MatchAnalyzer {
             }
             // A group like "AWS (EC2, S3, RDS)" counts once and is matched by the parent or any item.
             List<SubSkill> subs = js.subSkills().stream()
-                    .map(s -> new SubSkill(s.name(), s.category(), resumeSkills.contains(s)))
+                    .map(s -> direct.contains(s) ? new SubSkill(s.name(), s.category(), true, null)
+                            : implied.containsKey(s) ? new SubSkill(s.name(), s.category(), true, implied.get(s).name())
+                            : new SubSkill(s.name(), s.category(), false, null))
                     .toList();
-            boolean found = resumeSkills.contains(skill) || subs.stream().anyMatch(SubSkill::found);
-            if (found) {
-                matched.add(new MatchedSkill(skill.name(), skill.category(), js.importance(), subs));
+
+            // A direct mention (of the skill or a group item) beats an implied one.
+            boolean foundDirectly = direct.contains(skill)
+                    || subs.stream().anyMatch(s -> s.found() && s.impliedBy() == null);
+            String impliedBy = foundDirectly ? null
+                    : implied.containsKey(skill) ? implied.get(skill).name()
+                    : subs.stream().filter(SubSkill::found).map(SubSkill::impliedBy).findFirst().orElse(null);
+
+            if (foundDirectly || impliedBy != null) {
+                matched.add(new MatchedSkill(skill.name(), skill.category(), js.importance(), impliedBy, subs));
             } else {
                 (required ? missingRequired : missingPreferred)
                         .add(new MissingSkill(skill.name(), skill.category(), js.subSkills()));

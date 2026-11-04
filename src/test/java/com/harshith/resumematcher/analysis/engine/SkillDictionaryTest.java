@@ -4,9 +4,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SkillDictionaryTest {
 
@@ -102,6 +105,66 @@ class SkillDictionaryTest {
         assertThat(DICT.skillAtEnd("Experience with Spring Data JPA ")).contains(new Skill("Spring Data JPA", "framework"));
         assertThat(DICT.skillAtEnd("AWS")).contains(new Skill("AWS", "cloud"));
         assertThat(DICT.skillAtEnd("Cloud platforms")).isEmpty();
+    }
+
+    // ---- implies ----
+
+    private static Map<String, String> implied(String resumeText) {
+        Map<String, String> byName = new LinkedHashMap<>();
+        DICT.impliedBy(DICT.findIn(resumeText)).forEach((target, source) -> byName.put(target.name(), source.name()));
+        return byName;
+    }
+
+    @Test
+    void springSkillsImplyTheirBasics() {
+        assertThat(implied("Spring Data JPA")).containsExactly(
+                Map.entry("JPA", "Spring Data JPA"),
+                Map.entry("Hibernate", "Spring Data JPA"),
+                Map.entry("Spring Framework", "Spring Data JPA"));
+        assertThat(implied("Spring Boot")).containsExactly(Map.entry("Spring Framework", "Spring Boot"));
+        assertThat(implied("Spring Security")).containsExactly(Map.entry("Spring Framework", "Spring Security"));
+    }
+
+    @Test
+    void otherCommonImplications() {
+        assertThat(implied("PostgreSQL")).containsExactly(Map.entry("SQL", "PostgreSQL"));
+        assertThat(implied("Amazon S3")).containsExactly(Map.entry("AWS", "Amazon S3"));
+        assertThat(implied("Django")).containsExactly(Map.entry("Python", "Django"));
+        assertThat(implied("Next.js")).containsOnlyKeys("React", "JavaScript");
+        assertThat(implied("JUnit")).containsExactly(Map.entry("Unit testing", "JUnit"));
+        assertThat(implied("Scrum")).containsExactly(Map.entry("Agile", "Scrum"));
+    }
+
+    @Test
+    void skillsTheResumeNamesAreNotMarkedImplied() {
+        assertThat(implied("Spring Boot and Spring Framework")).isEmpty();
+        assertThat(implied("Hibernate, JPA")).isEmpty();
+    }
+
+    @Test
+    void firstImplyingSkillIsTheLabel() {
+        assertThat(implied("Spring Security, then Spring Boot"))
+                .containsExactly(Map.entry("Spring Framework", "Spring Security"));
+    }
+
+    @Test
+    void implicationsAreOneLevelOnly() {
+        // GitHub Actions implies GitHub, and GitHub implies Git, but GitHub Actions alone doesn't imply Git.
+        assertThat(implied("GitHub Actions")).containsOnlyKeys("CI/CD", "GitHub");
+    }
+
+    @Test
+    void invalidImpliesEntriesAreRejectedAtStartup() {
+        String unknown = """
+                {"skills": [{"name": "A1", "category": "tool", "aliases": [], "implies": ["Nope"]}]}""";
+        String self = """
+                {"skills": [{"name": "A1", "category": "tool", "aliases": [], "implies": ["A1"]}]}""";
+        assertThatThrownBy(() -> new SkillDictionary(stream(unknown))).hasMessageContaining("invalid implies entry: Nope");
+        assertThatThrownBy(() -> new SkillDictionary(stream(self))).hasMessageContaining("invalid implies entry: A1");
+    }
+
+    private static java.io.InputStream stream(String s) {
+        return new java.io.ByteArrayInputStream(s.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     @Test

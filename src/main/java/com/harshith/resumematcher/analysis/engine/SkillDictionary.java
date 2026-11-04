@@ -46,6 +46,7 @@ public class SkillDictionary {
     private static final String AFTER_SHORT = AFTER + "(?![\\-&'])";
 
     private final List<CompiledSkill> skills;
+    private final Map<Skill, List<Skill>> implies;
 
     public SkillDictionary() {
         this(SkillDictionary.class.getResourceAsStream(RESOURCE));
@@ -58,6 +59,7 @@ public class SkillDictionary {
         try (json) {
             SkillFile file = JsonMapper.builder().build().readValue(json, SkillFile.class);
             this.skills = compile(file.skills());
+            this.implies = resolveImplies(file.skills(), skills);
         } catch (IOException e) {
             throw new UncheckedIOException("Couldn't read skill dictionary", e);
         }
@@ -139,10 +141,52 @@ public class SkillDictionary {
     record SkillFile(List<SkillDefinition> skills) {
     }
 
-    record SkillDefinition(String name, String category, List<String> aliases, List<String> caseSensitive) {
+    record SkillDefinition(String name, String category, List<String> aliases, List<String> caseSensitive,
+                           List<String> implies) {
     }
 
     private record CompiledSkill(Skill skill, Pattern pattern) {
+    }
+
+    /**
+     * Skills a resume is assumed to have because of skills it names, e.g. "Spring Data JPA" implies
+     * JPA, Hibernate and Spring Framework. Only for the resume side; one level (not transitive).
+     *
+     * @param found skills found in the resume, in order
+     * @return implied skill → the first found skill that implies it; skills already in {@code found} are left out
+     */
+    public Map<Skill, Skill> impliedBy(List<Skill> found) {
+        Set<Skill> direct = Set.copyOf(found);
+        Map<Skill, Skill> result = new java.util.LinkedHashMap<>();
+        for (Skill source : found) {
+            for (Skill target : implies.getOrDefault(source, List.of())) {
+                if (!direct.contains(target)) {
+                    result.putIfAbsent(target, source);
+                }
+            }
+        }
+        return result;
+    }
+
+    private static Map<Skill, List<Skill>> resolveImplies(List<SkillDefinition> definitions, List<CompiledSkill> compiled) {
+        Map<String, Skill> byName = new HashMap<>();
+        compiled.forEach(c -> byName.put(c.skill().name(), c.skill()));
+        Map<Skill, List<Skill>> result = new HashMap<>();
+        for (SkillDefinition d : definitions) {
+            if (d.implies() == null || d.implies().isEmpty()) {
+                continue;
+            }
+            List<Skill> targets = new ArrayList<>();
+            for (String name : d.implies()) {
+                Skill target = byName.get(name);
+                if (target == null || name.equals(d.name())) {
+                    throw new IllegalStateException("Skill '" + d.name() + "' has an invalid implies entry: " + name);
+                }
+                targets.add(target);
+            }
+            result.put(byName.get(d.name()), List.copyOf(targets));
+        }
+        return Map.copyOf(result);
     }
 
     private static List<CompiledSkill> compile(List<SkillDefinition> definitions) {

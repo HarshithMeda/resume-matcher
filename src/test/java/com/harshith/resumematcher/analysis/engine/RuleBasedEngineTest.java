@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /** The analyzer and suggestion provider working together on made-up text. */
 class RuleBasedEngineTest {
@@ -60,9 +61,9 @@ class RuleBasedEngineTest {
         assertThat(r.missingRequiredSkills()).isEmpty();
         assertThat(r.matchedSkills()).extracting(MatchedSkill::name).containsExactly("Java", "AWS");
         assertThat(r.matchedSkills().get(1).subSkills()).containsExactly(
-                new SubSkill("Amazon EC2", "cloud", false),
-                new SubSkill("Amazon S3", "cloud", true),
-                new SubSkill("Amazon RDS", "cloud", false));
+                new SubSkill("Amazon EC2", "cloud", false, null),
+                new SubSkill("Amazon S3", "cloud", true, null),
+                new SubSkill("Amazon RDS", "cloud", false, null));
         ScoreComponent required = r.scoreBreakdown().components().getFirst();
         assertThat(required.matched()).isEqualTo(2);
         assertThat(required.total()).isEqualTo(2); // Java + one AWS group, not 5 skills
@@ -83,6 +84,60 @@ class RuleBasedEngineTest {
         assertThat(aws.subSkills()).extracting(Skill::name).containsExactly("Amazon EC2", "Amazon S3", "Amazon RDS");
         assertThat(TIPS.suggest("Java developer.", AWS_JOB, r).getFirst())
                 .startsWith("If you've used AWS (Amazon EC2, Amazon S3 or Amazon RDS), add it");
+    }
+
+    // ---- implied skills (resume side only) ----
+
+    @Test
+    void impliedSkillsCountAsMatchedAndAreLabelled() {
+        MatchResult r = ANALYZER.analyze("Built repositories with Spring Data JPA.",
+                "Requirements: JPA, Hibernate and Spring Data JPA.");
+        assertThat(r.missingRequiredSkills()).isEmpty();
+        assertThat(r.matchedSkills()).extracting(MatchedSkill::name, MatchedSkill::impliedBy).containsExactly(
+                tuple("JPA", "Spring Data JPA"),
+                tuple("Hibernate", "Spring Data JPA"),
+                tuple("Spring Data JPA", null));
+        assertThat(r.scoreBreakdown().components().getFirst().matched()).isEqualTo(3);
+    }
+
+    @Test
+    void directMentionBeatsImplication() {
+        MatchResult r = ANALYZER.analyze("JPA and Spring Data JPA", "Requirements: JPA");
+        assertThat(r.matchedSkills().getFirst().impliedBy()).isNull();
+    }
+
+    @Test
+    void implicationsAreNotUsedOnTheJobSide() {
+        // The job names Spring Data JPA only, so JPA and Hibernate are not added as requirements.
+        MatchResult r = ANALYZER.analyze("Java developer", "Requirements: Spring Data JPA");
+        assertThat(r.missingRequiredSkills()).extracting(MissingSkill::name).containsExactly("Spring Data JPA");
+        assertThat(r.scoreBreakdown().components().getFirst().total()).isEqualTo(1);
+    }
+
+    @Test
+    void groupCanBeMatchedThroughAnImpliedItem() {
+        MatchResult r = ANALYZER.analyze("Services built with Spring Boot",
+                "Requirements: Java (Spring Framework)");
+        MatchedSkill group = r.matchedSkills().getFirst();
+        assertThat(group.name()).isEqualTo("Java");
+        assertThat(group.impliedBy()).isEqualTo("Spring Boot");
+        assertThat(group.subSkills()).containsExactly(new SubSkill("Spring Framework", "framework", true, "Spring Boot"));
+    }
+
+    @Test
+    void groupCanBeMatchedThroughAnImpliedParent() {
+        MatchResult r = ANALYZER.analyze("Ran workloads on OpenShift", "Requirements: Kubernetes (Helm)");
+        assertThat(r.matchedSkills()).extracting(MatchedSkill::name, MatchedSkill::impliedBy)
+                .containsExactly(tuple("Kubernetes", "OpenShift"));
+    }
+
+    @Test
+    void alreadyMentionsTipOnlyListsSkillsTheResumeNames() {
+        String resume = "Built repositories with Spring Data JPA.";
+        String job = "Requirements: JPA and Spring Data JPA.";
+        List<String> tips = TIPS.suggest(resume, job, ANALYZER.analyze(resume, job));
+        assertThat(tips).anyMatch(t -> t.startsWith("Your resume already mentions Spring Data JPA."));
+        assertThat(tips).noneMatch(t -> t.contains("already mentions JPA"));
     }
 
     @Test

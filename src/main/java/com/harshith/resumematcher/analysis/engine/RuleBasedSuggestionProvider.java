@@ -59,9 +59,10 @@ public class RuleBasedSuggestionProvider implements SuggestionProvider {
                     + " describe your work, use the same wording.");
         }
 
-        // 4. Skills already there: make them count.
+        // 4. Skills already there: make them count. Implied ones aren't actually named, so leave them out.
         List<String> matchedRequired = result.matchedSkills().stream()
-                .filter(s -> s.importance() == Importance.REQUIRED).map(MatchedSkill::name).toList();
+                .filter(s -> s.importance() == Importance.REQUIRED && s.impliedBy() == null)
+                .map(MatchedSkill::name).toList();
         if (!matchedRequired.isEmpty()) {
             tips.add("Your resume already mentions " + Text.joinNames(matchedRequired, 3) + ". Back them up"
                     + " with a bullet point that shows what you built with them and the result.");

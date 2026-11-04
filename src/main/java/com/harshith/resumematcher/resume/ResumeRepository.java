@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,4 +29,11 @@ public interface ResumeRepository extends JpaRepository<Resume, Long> {
     @Modifying
     @Query("delete from Resume r where r.id = :id and r.userId = :userId")
     int deleteByIdAndUserId(Long id, Long userId);
+
+    List<Resume> findAllByUserIdOrderByCreatedAtDescIdDesc(Long userId);
+
+    /** Retention: resumes created before the cutoff. */
+    @Modifying
+    @Query("delete from Resume r where r.createdAt < :cutoff")
+    int deleteCreatedBefore(Instant cutoff);
 }

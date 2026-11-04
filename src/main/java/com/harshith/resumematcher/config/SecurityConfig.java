@@ -14,7 +14,14 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.harshith.resumematcher.user.UserRepository;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -40,6 +47,7 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
             "/api/auth/**",
+            "/api/privacy",
             "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html",
             "/error",
     };
@@ -91,13 +99,22 @@ public class SecurityConfig {
     }
 
     @Bean
-    JwtDecoder jwtDecoder(SecretKey key, @Value("${app.jwt.issuer}") String issuer) {
+    JwtDecoder jwtDecoder(SecretKey key, @Value("${app.jwt.issuer}") String issuer, UserRepository users) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key)
                 .macAlgorithm(MacAlgorithm.HS256) // only accept HS256 (rejects "alg": "none" etc.)
                 .build();
-        // Checks expiry (exp/nbf) and that we issued the token.
-        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer));
+        // Checks expiry (exp/nbf), that we issued the token, and that the account still exists
+        // (so a deleted account's token stops working immediately, not after it expires).
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefaultWithIssuer(issuer), userStillExists(users)));
         return decoder;
+    }
+
+    private static OAuth2TokenValidator<Jwt> userStillExists(UserRepository users) {
+        OAuth2Error gone = new OAuth2Error(OAuth2ErrorCodes.INVALID_TOKEN, "Account no longer exists", null);
+        return jwt -> jwt.getClaims().get("uid") instanceof Number uid && users.existsById(uid.longValue())
+                ? OAuth2TokenValidatorResult.success()
+                : OAuth2TokenValidatorResult.failure(gone);
     }
 
     /** 401 as JSON. The standard WWW-Authenticate header is still set by Spring's entry point. */

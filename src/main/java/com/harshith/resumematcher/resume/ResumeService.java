@@ -75,6 +75,12 @@ public class ResumeService {
                 .orElseThrow(ResumeService::notFound);
     }
 
+    /** Every resume of the user, with text, for the data export. */
+    @Transactional(readOnly = true)
+    public List<ResumeDetail> exportAll(long userId) {
+        return resumes.findAllByUserIdOrderByCreatedAtDescIdDesc(userId).stream().map(ResumeDetail::from).toList();
+    }
+
     @Transactional
     public void delete(long userId, long resumeId) {
         if (resumes.deleteByIdAndUserId(resumeId, userId) == 0) {

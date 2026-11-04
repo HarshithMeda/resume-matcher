@@ -1,6 +1,8 @@
 package com.harshith.resumematcher.error;
 
+import com.harshith.resumematcher.ratelimit.RateLimitedException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -30,6 +32,14 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(RateLimitedException.class)
+    public ResponseEntity<ApiError> handleRateLimited(RateLimitedException ex, HttpServletRequest req) {
+        HttpStatus status = HttpStatus.TOO_MANY_REQUESTS;
+        return ResponseEntity.status(status)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.retryAfterSeconds()))
+                .body(ApiError.of(status.value(), status.getReasonPhrase(), ex.getMessage(), req.getRequestURI()));
+    }
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> handleApi(ApiException ex, HttpServletRequest req) {

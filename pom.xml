@@ -64,6 +64,13 @@
 			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
 		</dependency>
 
+		<!-- PDF text extraction -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.8</version>
+		</dependency>
+
 		<!-- Swagger UI / OpenAPI docs. 3.2.0 is built against Spring Boot 4.1.2 -->
 		<dependency>
 			<groupId>org.springdoc</groupId>

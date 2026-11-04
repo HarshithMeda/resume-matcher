@@ -1,5 +1,6 @@
 package com.harshith.resumematcher.user;
 
+import com.harshith.resumematcher.auth.CurrentUser;
 import com.harshith.resumematcher.error.ApiException;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.HttpStatus;
@@ -22,11 +23,7 @@ public class MeController {
     @Operation(summary = "The currently logged-in user")
     @GetMapping("/me")
     public UserResponse me(@AuthenticationPrincipal Jwt jwt) {
-        Number uid = jwt.getClaim("uid");
-        if (uid == null) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid or expired token");
-        }
-        return users.findById(uid.longValue())
+        return users.findById(CurrentUser.id(jwt))
                 .map(UserResponse::from)
                 // Valid signature but the account is gone (e.g. deleted): treat as not logged in.
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid or expired token"));

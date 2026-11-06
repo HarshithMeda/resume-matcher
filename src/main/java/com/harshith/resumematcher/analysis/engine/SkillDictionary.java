@@ -84,29 +84,33 @@ public class SkillDictionary {
      * "GitHub Actions" is not also "GitHub", "Tailwind CSS" is not also "CSS".
      */
     public List<Skill> findIn(String text) {
-        record Span(Skill skill, int start, int end) {
-            boolean insideLonger(Span other) {
-                return !other.skill.equals(skill) && other.start <= start && end <= other.end
-                        && other.end - other.start > end - start;
-            }
+        Map<Skill, Integer> firstPosition = new java.util.LinkedHashMap<>();
+        for (Mention m : mentionsIn(text)) {
+            firstPosition.putIfAbsent(m.skill(), m.start());
         }
-        List<Span> spans = new ArrayList<>();
+        return List.copyOf(firstPosition.keySet()); // mentions are in text order already
+    }
+
+    /** One place a skill is mentioned: [start, end) in the text. */
+    public record Mention(Skill skill, int start, int end) {
+        boolean insideLonger(Mention other) {
+            return !other.skill.equals(skill) && other.start <= start && end <= other.end
+                    && other.end - other.start > end - start;
+        }
+    }
+
+    /** Every skill mention in text order, leaving out ones inside a longer skill's mention. */
+    public List<Mention> mentionsIn(String text) {
+        List<Mention> all = new ArrayList<>();
         for (CompiledSkill s : skills) {
             Matcher m = s.pattern().matcher(text);
             while (m.find()) {
-                spans.add(new Span(s.skill(), m.start(), m.end()));
+                all.add(new Mention(s.skill(), m.start(), m.end()));
             }
         }
-        Map<Skill, Integer> firstPosition = new java.util.LinkedHashMap<>();
-        for (Span span : spans) {
-            boolean shadowed = spans.stream().anyMatch(span::insideLonger);
-            if (!shadowed) {
-                firstPosition.merge(span.skill(), span.start(), Math::min);
-            }
-        }
-        return firstPosition.entrySet().stream()
-                .sorted(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
+        return all.stream()
+                .filter(mention -> all.stream().noneMatch(mention::insideLonger))
+                .sorted(Comparator.comparingInt(Mention::start))
                 .toList();
     }
 

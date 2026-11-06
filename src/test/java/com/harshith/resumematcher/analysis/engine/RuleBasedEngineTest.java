@@ -157,14 +157,75 @@ class RuleBasedEngineTest {
                 Requirements:
                 - SQL, Tableau and Jira
                 - Excellent communication skills and strong problem-solving skills
-                - CBAP or PMP certification required
+                - CBAP and PMP certifications required
                 """;
         List<String> tips = TIPS.suggest("Analyst", job, ANALYZER.analyze("Analyst", job));
         assertThat(tips).contains(
                 "The job asks for communication skills and problem-solving skills. Where they describe you, show them"
                         + " with concrete examples in your role bullets rather than only listing the words.",
                 "The job asks for CBAP or PMP certification. If you hold one, list it in a Certifications section.");
+        // Written as an either-or, it's one certification group with the usual wording.
+        String eitherJob = "Requirements: CBAP or PMP certification.";
+        assertThat(TIPS.suggest("Analyst", eitherJob, ANALYZER.analyze("Analyst", eitherJob)).getFirst())
+                .isEqualTo("If you hold the CBAP or PMP certification, list it in a Certifications section."
+                        + " If you don't, leave it out.");
         assertThat(tips).noneMatch(t -> t.contains("learning the basics") && t.contains("communication"));
+    }
+
+    // ---- either-or groups ----
+
+    @Test
+    void eitherOrIsMatchedByAnyOptionAndShowsWhichOne() {
+        String job = "Requirements: SQL. Nice to have: Power BI or Tableau.";
+        MatchResult r = ANALYZER.analyze("Analyst using SQL and Tableau dashboards.", job);
+        assertThat(r.missingPreferredSkills()).isEmpty();
+        MatchedSkill group = r.matchedSkills().stream().filter(MatchedSkill::eitherOr).findFirst().orElseThrow();
+        assertThat(group.name()).isEqualTo("Power BI or Tableau");
+        assertThat(group.importance()).isEqualTo(Importance.PREFERRED);
+        assertThat(group.impliedBy()).isNull();
+        assertThat(group.subSkills()).containsExactly(
+                new SubSkill("Power BI", "analytics", false, null),
+                new SubSkill("Tableau", "analytics", true, null));
+        // Counts as one preferred skill, not two.
+        assertThat(r.scoreBreakdown().components().get(1).total()).isEqualTo(1);
+    }
+
+    @Test
+    void eitherOrCanBeMatchedThroughAnImpliedSkill() {
+        MatchResult r = ANALYZER.analyze("Stored files in Amazon S3.", "Requirements: AWS or Azure");
+        MatchedSkill group = r.matchedSkills().getFirst();
+        assertThat(group.name()).isEqualTo("AWS or Azure");
+        assertThat(group.impliedBy()).isEqualTo("Amazon S3");
+        assertThat(group.subSkills().getFirst()).isEqualTo(new SubSkill("AWS", "cloud", true, "Amazon S3"));
+    }
+
+    @Test
+    void missingEitherOrNamesAllOptionsInTheTip() {
+        String job = "Requirements: AWS, Azure or GCP";
+        MatchResult r = ANALYZER.analyze("Java developer", job);
+        MissingSkill missing = r.missingRequiredSkills().getFirst();
+        assertThat(missing.name()).isEqualTo("AWS, Azure or GCP");
+        assertThat(missing.eitherOr()).isTrue();
+        assertThat(missing.subSkills()).extracting(Skill::name).containsExactly("AWS", "Azure", "GCP");
+        assertThat(TIPS.suggest("Java developer", job, r).getFirst()).isEqualTo(
+                "The job asks for AWS, Azure or GCP. If you've used any of them, add it to your skills section"
+                        + " and mention where you applied it. If you haven't, leave them out.");
+    }
+
+    @Test
+    void alreadyMentionsTipNamesTheOptionTheResumeHas() {
+        String resume = "Built services in Kotlin.";
+        String job = "Requirements: Java or Kotlin.";
+        assertThat(TIPS.suggest(resume, job, ANALYZER.analyze(resume, job)))
+                .anyMatch(t -> t.startsWith("Your resume already mentions Kotlin."));
+    }
+
+    @Test
+    void certificationEitherOrReadsNaturally() {
+        assertThat(RuleBasedSuggestionProvider.missingSkillTip(
+                new MissingSkill("CBAP or ECBA", "certification", List.of(), true)))
+                .isEqualTo("If you hold the CBAP or ECBA certification, list it in a Certifications section."
+                        + " If you don't, leave it out.");
     }
 
     @Test

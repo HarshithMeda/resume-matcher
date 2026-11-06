@@ -52,24 +52,27 @@ public class RuleBasedMatchAnalyzer implements MatchAnalyzer {
                 preferredTotal++;
             }
             // A group like "AWS (EC2, S3, RDS)" counts once and is matched by the parent or any item.
-            List<SubSkill> subs = js.subSkills().stream()
+            // For either-or groups the options play the role of sub-skills: any one of them counts.
+            List<Skill> parts = js.isEitherOr() ? js.alternatives() : js.subSkills();
+            List<SubSkill> subs = parts.stream()
                     .map(s -> direct.contains(s) ? new SubSkill(s.name(), s.category(), true, null)
                             : implied.containsKey(s) ? new SubSkill(s.name(), s.category(), true, implied.get(s).name())
                             : new SubSkill(s.name(), s.category(), false, null))
                     .toList();
 
             // A direct mention (of the skill or a group item) beats an implied one.
-            boolean foundDirectly = direct.contains(skill)
+            boolean foundDirectly = (!js.isEitherOr() && direct.contains(skill))
                     || subs.stream().anyMatch(s -> s.found() && s.impliedBy() == null);
             String impliedBy = foundDirectly ? null
-                    : implied.containsKey(skill) ? implied.get(skill).name()
+                    : !js.isEitherOr() && implied.containsKey(skill) ? implied.get(skill).name()
                     : subs.stream().filter(SubSkill::found).map(SubSkill::impliedBy).findFirst().orElse(null);
 
             if (foundDirectly || impliedBy != null) {
-                matched.add(new MatchedSkill(skill.name(), skill.category(), js.importance(), impliedBy, subs));
+                matched.add(new MatchedSkill(js.displayName(), skill.category(), js.importance(), impliedBy, subs,
+                        js.isEitherOr()));
             } else {
                 (required ? missingRequired : missingPreferred)
-                        .add(new MissingSkill(skill.name(), skill.category(), js.subSkills()));
+                        .add(new MissingSkill(js.displayName(), skill.category(), parts, js.isEitherOr()));
             }
         }
         // Required first; within each group, the order the job lists them. (List.sort is stable.)

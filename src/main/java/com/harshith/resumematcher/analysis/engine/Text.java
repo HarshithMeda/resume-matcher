@@ -7,6 +7,14 @@ final class Text {
     private Text() {
     }
 
+    /** ["A","B"] -> "A or B"; ["A","B","C"] -> "A, B or C". */
+    static String joinWithOr(List<String> names) {
+        if (names.size() <= 1) {
+            return names.isEmpty() ? "" : names.getFirst();
+        }
+        return String.join(", ", names.subList(0, names.size() - 1)) + " or " + names.getLast();
+    }
+
     /** ["A"] -> "A"; ["A","B"] -> "A and B"; ["A","B","C","D"] with max 3 -> "A, B, C and 1 more". */
     static String joinNames(List<String> names, int max) {
         if (names.isEmpty()) {

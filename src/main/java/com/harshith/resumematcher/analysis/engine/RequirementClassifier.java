@@ -27,6 +27,7 @@ import java.util.regex.Pattern;
  *   <li>Otherwise the section decides. No section or wording means required.</li>
  *   <li>A skill that is required anywhere in the posting stays required.</li>
  *   <li>"AWS (EC2, S3, RDS)" is one skill group, not four skills.</li>
+ *   <li>"Power BI or Tableau" is one either-or group: any of them counts.</li>
  * </ol>
  */
 @Component
@@ -72,9 +73,8 @@ public class RequirementClassifier {
      * that the job also lists on its own elsewhere stays a separate skill and leaves the group.
      */
     public List<JobSkill> classify(String jobDescription) {
-        record Entry(Importance importance, Set<Skill> subSkills) {
-        }
-        Map<Skill, Entry> entries = new LinkedHashMap<>();
+        // Keyed by the skill (single skills, parent groups) or by the list of options (either-or groups).
+        Map<Object, Entry> entries = new LinkedHashMap<>();
         Set<Skill> standalone = new HashSet<>();
         Importance section = null; // null = no section yet / neutral section
 
@@ -92,31 +92,145 @@ public class RequirementClassifier {
             Importance wording = wording(lower);
             Importance importance = wording != null ? wording : section == null ? Importance.REQUIRED : section;
             Map<Skill, Skill> parentOf = groupsIn(piece);
+            Map<Skill, List<Skill>> optionsOf = eitherOrGroupsIn(piece, parentOf);
 
             for (Skill skill : skills) {
                 Skill parent = parentOf.get(skill);
+                List<Skill> options = optionsOf.get(skill);
                 if (parent != null) {
-                    entries.computeIfAbsent(parent, p -> new Entry(importance, new LinkedHashSet<>()))
-                            .subSkills().add(skill);
-                    continue;
-                }
-                standalone.add(skill);
-                Entry old = entries.get(skill);
-                if (old == null) {
-                    entries.put(skill, new Entry(importance, new LinkedHashSet<>()));
-                } else if (old.importance() != Importance.REQUIRED && importance == Importance.REQUIRED) {
-                    // Required anywhere beats preferred elsewhere.
-                    entries.put(skill, new Entry(Importance.REQUIRED, old.subSkills()));
+                    entry(entries, parent, importance, null).subSkills().add(skill);
+                } else if (options != null) {
+                    entry(entries, options, importance, options);
+                } else {
+                    standalone.add(skill);
+                    entry(entries, skill, importance, null);
                 }
             }
         }
 
         List<JobSkill> result = new ArrayList<>();
-        entries.forEach((skill, entry) -> {
-            List<Skill> subs = entry.subSkills().stream().filter(s -> !standalone.contains(s)).toList();
-            result.add(new JobSkill(skill, entry.importance(), subs));
+        entries.forEach((key, entry) -> {
+            if (entry.alternatives() != null) {
+                // If the job also lists one of the options on its own, that skill is already counted;
+                // keeping the either-or as well would count it twice.
+                if (entry.alternatives().stream().noneMatch(standalone::contains)) {
+                    result.add(new JobSkill(entry.alternatives().getFirst(), entry.importance(), List.of(),
+                            entry.alternatives()));
+                }
+            } else {
+                List<Skill> subs = entry.subSkills().stream().filter(sub -> !standalone.contains(sub)).toList();
+                result.add(new JobSkill((Skill) key, entry.importance(), subs));
+            }
         });
         return result;
+    }
+
+    private static final class Entry {
+        private Importance importance;
+        private final Set<Skill> subSkills = new LinkedHashSet<>();
+        private final List<Skill> alternatives;
+
+        Entry(Importance importance, List<Skill> alternatives) {
+            this.importance = importance;
+            this.alternatives = alternatives;
+        }
+
+        Importance importance() {
+            return importance;
+        }
+
+        Set<Skill> subSkills() {
+            return subSkills;
+        }
+
+        List<Skill> alternatives() {
+            return alternatives;
+        }
+    }
+
+    /** Finds or creates the entry; required anywhere beats preferred elsewhere. */
+    private static Entry entry(Map<Object, Entry> entries, Object key, Importance importance, List<Skill> alternatives) {
+        Entry e = entries.computeIfAbsent(key, k -> new Entry(importance, alternatives));
+        if (importance == Importance.REQUIRED) {
+            e.importance = Importance.REQUIRED;
+        }
+        return e;
+    }
+
+    private enum Connector { OR, COMMA, OTHER }
+
+    // Between two skills: "or", ", or", "and/or", "either ... or", or a slash ("Power BI/Tableau").
+    private static final Pattern OR_CONNECTOR =
+            Pattern.compile("\\s*(?:,\\s*)?(?:or|and/or|/)\\s*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern COMMA_CONNECTOR = Pattern.compile("\\s*,\\s*");
+
+    /**
+     * Either-or groups in this piece: skills joined by "or" or "/" ("Power BI or Tableau",
+     * "Java/Kotlin"). A comma list ending in "or" joins the group while its items share a category:
+     * "AWS, Azure or GCP" is one group, but in "Java, SQL, Docker or Kubernetes" only Docker and
+     * Kubernetes are alternatives. Lists joined by "and" are never groups.
+     *
+     * @return each grouped skill → all the options of its group
+     */
+    private Map<Skill, List<Skill>> eitherOrGroupsIn(String piece, Map<Skill, Skill> parentOf) {
+        Set<Skill> parents = new HashSet<>(parentOf.values());
+        List<SkillDictionary.Mention> mentions = dictionary.mentionsIn(piece).stream()
+                // Parent groups ("AWS (EC2, S3)") are handled separately.
+                .filter(m -> !parentOf.containsKey(m.skill()) && !parents.contains(m.skill()))
+                .toList();
+        int n = mentions.size();
+        if (n < 2) {
+            return Map.of();
+        }
+        Connector[] between = new Connector[n - 1];
+        for (int i = 0; i < n - 1; i++) {
+            int from = mentions.get(i).end();
+            int to = mentions.get(i + 1).start();
+            String text = from <= to ? piece.substring(from, to) : "";
+            between[i] = OR_CONNECTOR.matcher(text).matches() ? Connector.OR
+                    : COMMA_CONNECTOR.matcher(text).matches() ? Connector.COMMA
+                    : Connector.OTHER;
+        }
+
+        List<int[]> ranges = new ArrayList<>();
+        for (int k = 0; k < n - 1; k++) {
+            if (between[k] != Connector.OR) {
+                continue;
+            }
+            String category = mentions.get(k).skill().category();
+            int first = k;
+            while (first > 0 && (between[first - 1] == Connector.OR
+                    || (between[first - 1] == Connector.COMMA
+                    && mentions.get(first - 1).skill().category().equals(category)))) {
+                first--;
+            }
+            int last = k + 1;
+            while (last < n - 1 && between[last] == Connector.OR) {
+                last++;
+            }
+            ranges.add(new int[] {first, last});
+        }
+
+        // Merge overlapping ranges ("A or B or C" finds two that cover the same skills).
+        ranges.sort(java.util.Comparator.comparingInt(r -> r[0]));
+        List<int[]> merged = new ArrayList<>();
+        for (int[] r : ranges) {
+            if (!merged.isEmpty() && r[0] <= merged.getLast()[1]) {
+                merged.getLast()[1] = Math.max(merged.getLast()[1], r[1]);
+            } else {
+                merged.add(r);
+            }
+        }
+
+        Map<Skill, List<Skill>> optionsOf = new HashMap<>();
+        for (int[] r : merged) {
+            List<Skill> options = mentions.subList(r[0], r[1] + 1).stream()
+                    .map(SkillDictionary.Mention::skill).distinct().toList();
+            if (options.size() >= 2) {
+                options.forEach(skill -> optionsOf.putIfAbsent(skill, options));
+            }
+        }
+        return optionsOf;
     }
 
     /** For "AWS (EC2, S3, RDS)" in this piece: EC2 → AWS, S3 → AWS, RDS → AWS. */

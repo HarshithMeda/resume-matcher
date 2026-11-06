@@ -35,10 +35,15 @@ public class RuleBasedSuggestionProvider implements SuggestionProvider {
             case "soft-skill" -> "The job asks for " + skill.name().toLowerCase(java.util.Locale.ROOT)
                     + ". If that describes you, show it with a concrete example in a role bullet"
                     + " rather than only listing the word.";
-            // For a group the label lists its items: "If you've used AWS (Amazon EC2, Amazon S3 or Amazon RDS)".
-            default -> (TOOL_CATEGORIES.contains(skill.category()) ? "If you've used " : "If you've worked with ")
-                    + skill.label() + ", add it to your skills section and mention where you applied it in a"
-                    + " project or role. If you haven't, leave it out.";
+            // Either-or: "The job asks for Power BI or Tableau. If you've used either, ..."
+            default -> skill.eitherOr()
+                    ? "The job asks for " + skill.name() + ". If you've " + (TOOL_CATEGORIES.contains(skill.category())
+                            ? "used" : "worked with") + " any of them, add it to your skills section and mention"
+                            + " where you applied it. If you haven't, leave them out."
+                    // For a group the label lists its items: "If you've used AWS (Amazon EC2, Amazon S3 or Amazon RDS)".
+                    : (TOOL_CATEGORIES.contains(skill.category()) ? "If you've used " : "If you've worked with ")
+                            + skill.label() + ", add it to your skills section and mention where you applied it in a"
+                            + " project or role. If you haven't, leave it out.";
         };
     }
 
@@ -100,7 +105,11 @@ public class RuleBasedSuggestionProvider implements SuggestionProvider {
         // 4. Skills already there: make them count. Implied ones aren't actually named, so leave them out.
         List<String> matchedRequired = result.matchedSkills().stream()
                 .filter(s -> s.importance() == Importance.REQUIRED && s.impliedBy() == null)
-                .map(MatchedSkill::name).toList();
+                .map(s -> s.eitherOr()
+                        ? s.subSkills().stream().filter(o -> o.found() && o.impliedBy() == null)
+                                .map(SubSkill::name).findFirst().orElse(s.name())
+                        : s.name())
+                .toList();
         if (!matchedRequired.isEmpty()) {
             tips.add("Your resume already mentions " + Text.joinNames(matchedRequired, 3) + ". Back them up"
                     + " with a bullet point that shows what you built with them and the result.");

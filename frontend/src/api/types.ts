@@ -51,13 +51,16 @@ export interface MatchedSkill {
   category: string;
   importance: Importance;
   impliedBy?: string;
+  /** Group items ("AWS (EC2, S3)") or, when eitherOr is true, the options ("Power BI or Tableau"). */
   subSkills?: SubSkill[];
+  eitherOr?: boolean;
 }
 
 export interface MissingSkill {
   name: string;
   category: string;
   subSkills?: Skill[];
+  eitherOr?: boolean;
 }
 
 export interface ScoreComponent {

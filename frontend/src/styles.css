@@ -582,6 +582,7 @@ p {
   margin: 0;
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start; /* a tall group chip shouldn't stretch its neighbours */
   gap: 0.5rem;
 }
 

@@ -102,8 +102,9 @@ function MatchedChips({ title, skills }: { title: string; skills: MatchedSkill[]
               {s.name}
             </span>
             {s.impliedBy && <span className="chip-note">implied by {s.impliedBy}</span>}
+            {s.eitherOr && <span className="chip-note">any one is enough · matched: {matchedOptions(s)}</span>}
             {s.subSkills && s.subSkills.length > 0 && (
-              <ul className="sub-skills" aria-label={`${s.name} includes`}>
+              <ul className="sub-skills" aria-label={s.eitherOr ? `${s.name}: options` : `${s.name} includes`}>
                 {s.subSkills.map((sub) => (
                   <li key={sub.name} className={sub.found ? "found" : "not-found"}>
                     <span aria-hidden="true">{sub.found ? "✓" : "✗"} </span>
@@ -121,6 +122,14 @@ function MatchedChips({ title, skills }: { title: string; skills: MatchedSkill[]
   );
 }
 
+/** "Tableau", or "Power BI and Tableau" if the resume has several of the options. */
+function matchedOptions(s: MatchedSkill): string {
+  return (s.subSkills ?? [])
+    .filter((o) => o.found)
+    .map((o) => o.name)
+    .join(" and ");
+}
+
 function MissingChips({ skills, tone, empty }: { skills: MissingSkill[]; tone: "bad" | "warn"; empty: string }) {
   if (skills.length === 0) {
     return <p className="muted">{empty}</p>;
@@ -130,8 +139,11 @@ function MissingChips({ skills, tone, empty }: { skills: MissingSkill[]; tone: "
       {skills.map((s) => (
         <li key={s.name} className={`chip ${tone}`}>
           <span className="chip-name">{s.name}</span>
-          {s.subSkills && s.subSkills.length > 0 && (
-            <span className="chip-note">any of: {s.subSkills.map((x) => x.name).join(", ")}</span>
+          {s.eitherOr ? (
+            <span className="chip-note">any one is enough</span>
+          ) : (
+            s.subSkills &&
+            s.subSkills.length > 0 && <span className="chip-note">any of: {s.subSkills.map((x) => x.name).join(", ")}</span>
           )}
         </li>
       ))}

@@ -22,6 +22,16 @@ const analysis: Analysis = {
     { name: "Java", category: "language", importance: "REQUIRED" },
     { name: "JPA", category: "framework", importance: "REQUIRED", impliedBy: "Hibernate" },
     {
+      name: "Power BI or Tableau",
+      category: "analytics",
+      importance: "PREFERRED",
+      eitherOr: true,
+      subSkills: [
+        { name: "Power BI", category: "analytics", found: false },
+        { name: "Tableau", category: "analytics", found: true },
+      ],
+    },
+    {
       name: "AWS",
       category: "cloud",
       importance: "PREFERRED",
@@ -31,7 +41,10 @@ const analysis: Analysis = {
       ],
     },
   ],
-  missingRequiredSkills: [{ name: "Docker", category: "devops" }],
+  missingRequiredSkills: [
+    { name: "Docker", category: "devops" },
+    { name: "Kafka or RabbitMQ", category: "messaging", eitherOr: true, subSkills: [{ name: "Apache Kafka", category: "messaging" }, { name: "RabbitMQ", category: "messaging" }] },
+  ],
   missingPreferredSkills: [{ name: "Azure", category: "cloud", subSkills: [{ name: "Azure DevOps", category: "devops" }] }],
   matchedKeywords: ["payments", "latency"],
   missingKeywords: ["scalable"],
@@ -57,6 +70,16 @@ describe("AnalysisResult", () => {
     expect(screen.getByText("implied by Hibernate")).toBeInTheDocument();
     const items = within(screen.getByRole("list", { name: "AWS includes" })).getAllByRole("listitem");
     expect(items.map((li) => li.textContent)).toEqual(["✗ Amazon EC2 (not found)", "✓ Amazon S3 (found)"]);
+  });
+
+  it("shows either-or groups with the option that matched", () => {
+    render(<AnalysisResult analysis={analysis} />);
+    expect(screen.getByText("Power BI or Tableau")).toBeInTheDocument();
+    expect(screen.getByText("any one is enough · matched: Tableau")).toBeInTheDocument();
+    const options = within(screen.getByRole("list", { name: "Power BI or Tableau: options" })).getAllByRole("listitem");
+    expect(options.map((li) => li.textContent)).toEqual(["✗ Power BI (not found)", "✓ Tableau (found)"]);
+    // A missing either-or says any one is enough instead of listing "any of".
+    expect(screen.getByText("Kafka or RabbitMQ").parentElement).toHaveTextContent("any one is enough");
   });
 
   it("shows missing skills as chips, keywords and tips", () => {

@@ -1,0 +1,17 @@
+# Build output and version control
+target
+.git
+.github
+
+# Secrets: never send these into an image
+local.properties
+.env
+.env.*
+!.env.example
+
+# OS and editor files
+.DS_Store
+.idea
+.vscode
+*.iml
+HELP.md

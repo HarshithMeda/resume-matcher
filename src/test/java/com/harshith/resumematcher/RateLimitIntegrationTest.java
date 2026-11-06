@@ -1,13 +1,12 @@
 package com.harshith.resumematcher;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@IntegrationTest
 class RateLimitIntegrationTest extends ApiTestSupport {
 
     private static final String JOB = "Requirements: Java, Spring Boot and PostgreSQL. Nice to have: Docker and Kafka.";

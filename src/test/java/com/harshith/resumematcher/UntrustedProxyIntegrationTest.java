@@ -1,7 +1,7 @@
 package com.harshith.resumematcher;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -9,8 +9,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Here 127.0.0.1 is NOT a trusted proxy, so X-Forwarded-For must be ignored: a client can't dodge
  * the per-IP limits by sending a fake header.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "server.tomcat.remoteip.internal-proxies=10.255.255.1/32")
+@IntegrationTest
+@TestPropertySource(properties = "server.tomcat.remoteip.internal-proxies=10.255.255.1/32")
 class UntrustedProxyIntegrationTest extends ApiTestSupport {
 
     @Test

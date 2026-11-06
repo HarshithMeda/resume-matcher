@@ -6,7 +6,6 @@ import com.harshith.resumematcher.privacy.RetentionService;
 import com.harshith.resumematcher.resume.Resume;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.JsonNode;
 
@@ -16,7 +15,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@IntegrationTest
 class PrivacyIntegrationTest extends ApiTestSupport {
 
     private static final String JOB = "Requirements: Java, Spring Boot and PostgreSQL. Nice to have: Docker and Kafka.";

@@ -22,8 +22,9 @@ import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Helpers for tests that call the real running app over HTTP (so Tomcat's proxy handling runs too).
- * Uses the local database; every account a test creates is deleted afterwards (cascading to its data).
- * Subclasses add @SpringBootTest(webEnvironment = RANDOM_PORT).
+ * Runs against a PostgreSQL container (see {@link IntegrationTest}); accounts a test creates are
+ * deleted afterwards so tests sharing a container stay independent.
+ * Subclasses are annotated with {@link IntegrationTest}.
  */
 public abstract class ApiTestSupport {
 

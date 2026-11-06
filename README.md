@@ -24,9 +24,15 @@ A Spring Boot API that compares a resume (PDF) with a job description and explai
   skill ("Java, SQL, Docker or Kubernetes" groups just Docker and Kubernetes). Alternatives written
   in other ways ("one of: …", separate bullets) are still counted as separate skills, and a slash
   always means "or" (so "Agile/Scrum" is satisfied by either one).
-- **Skills are found by wording.** Each skill has a list of names and common phrasings; a resume that
-  describes a skill in other words (e.g. "kept the Jira backlog refined" for backlog management) won't
-  be credited for it.
+- **Skills are found by wording.** Each skill has a list of names and common phrasings (for example
+  "UAT", "user acceptance testing" and "UAT sessions"; "stakeholder engagement" and "managed
+  stakeholders"). A resume that describes a skill in words that aren't on the list won't be credited
+  for it. The lists are kept fairly strict on purpose, so phrases like "continuous improvement" or
+  "functional requirements" don't turn every developer posting into a business-analysis one.
+- **Word forms use simple rules.** Keywords are compared by a rule-based base form ("process",
+  "processes" and "processing" are one keyword; so are "document", "documented" and "documentation").
+  It doesn't know irregular forms ("ran" vs "run") or every derived word ("automation" and "automate"
+  stay different), and everyday verbs and filler words ("manage", "online", "team") are ignored.
 - **Rate limits are kept in memory.** Login, sign-up and daily analysis counts reset when the app
   restarts, and each app instance counts separately. That's fine for a single instance; running
   several would need a shared store such as the database.

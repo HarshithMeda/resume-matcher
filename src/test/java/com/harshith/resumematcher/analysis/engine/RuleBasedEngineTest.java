@@ -228,6 +228,35 @@ class RuleBasedEngineTest {
                         + " If you don't, leave it out.");
     }
 
+    // ---- keyword word forms and generic words ----
+
+    @Test
+    void keywordFormsCountAsOneKeyword() {
+        KeywordExtractor kw = new KeywordExtractor(DICT);
+        List<String> keywords = kw.keywords("We process claims. Claims processing and claim documentation. Documented claims processes.");
+        // "process/processing/processes" and "claim/claims" are one keyword each.
+        assertThat(keywords.stream().filter(k -> Stemmer.stem(k).equals("process"))).hasSize(1);
+        assertThat(keywords.stream().filter(k -> Stemmer.stem(k).equals("claim"))).hasSize(1);
+
+        KeywordExtractor.KeywordResult r = kw.compare("We handle claims processing and documentation for retail inventory.",
+                "Processed claims; documented the retail inventories.");
+        assertThat(r.missing()).isEmpty();
+        assertThat(r.matched()).contains("claims", "processing", "retail", "inventory");
+    }
+
+    @Test
+    void genericVerbsAndFillerAreNotKeywords() {
+        KeywordExtractor kw = new KeywordExtractor(DICT);
+        List<String> keywords = kw.keywords("""
+                You will manage online channels, document decisions, work with the team, support
+                colleagues, help others and ensure quality. Managing, documenting and supporting are part of
+                the role. Our retail inventory and supply chain operations span grocery and logistics.
+                """);
+        assertThat(keywords).doesNotContain("manage", "managing", "online", "channels", "document", "documenting",
+                "work", "team", "support", "supporting", "help", "ensure", "role");
+        assertThat(keywords).contains("retail", "inventory", "supply", "chain", "grocery", "logistics");
+    }
+
     @Test
     void emailsAndLinksDoNotCountAsKeywordMatches() {
         KeywordExtractor kw = new KeywordExtractor(DICT);

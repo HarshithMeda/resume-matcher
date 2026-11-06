@@ -206,8 +206,8 @@ class SkillDictionaryTest {
         assertThat(names("Excellent written and verbal communication skills")).containsExactly("Communication skills");
         assertThat(names("Strong problem-solving and leadership skills")).containsExactly("Problem-solving skills", "Leadership skills");
         assertThat(names("Comfortable presenting to senior stakeholders")).containsExactly("Presentation skills");
-        // "stakeholder communication" is its own skill, not the soft skill.
-        assertThat(names("Stakeholder communication")).containsExactly("Stakeholder communication");
+        // "stakeholder communication" is a way of saying stakeholder management, not the soft skill.
+        assertThat(names("Stakeholder communication")).containsExactly("Stakeholder management");
     }
 
     @Test
@@ -231,9 +231,48 @@ class SkillDictionaryTest {
         assertThat(implied("A/B testing")).containsExactly(Map.entry("Statistics", "A/B testing"));
         assertThat(implied("BPMN")).containsExactly(Map.entry("Process mapping", "BPMN"));
         assertThat(implied("User stories")).containsExactly(Map.entry("Agile", "User stories"));
-        assertThat(implied("Stakeholder management"))
-                .containsExactly(Map.entry("Stakeholder communication", "Stakeholder management"));
         assertThat(implied("pandas")).containsOnlyKeys("Python", "Data analysis");
+    }
+
+    // ---- wording variants, so real resumes aren't marked missing for different wording ----
+
+    @ParameterizedTest
+    @ValueSource(strings = {"user acceptance testing", "UAT testing", "UAT sessions", "user acceptance tests"})
+    void uatVariants(String text) {
+        assertThat(names(text)).containsExactly("UAT");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"stakeholder management", "stakeholder engagement", "stakeholder communication",
+            "managed stakeholders", "managing stakeholders", "liaised with stakeholders",
+            "communicated with stakeholders", "stakeholder relationships"})
+    void stakeholderManagementVariants(String text) {
+        assertThat(names(text)).containsExactly("Stakeholder management");
+    }
+
+    @Test
+    void otherBusinessAndDataVariants() {
+        assertThat(names("wrote a user story")).containsExactly("User stories");
+        assertThat(names("each acceptance criterion")).containsExactly("Acceptance criteria");
+        assertThat(names("Ran requirements workshops and wrote BRDs")).containsExactly("Requirements gathering");
+        assertThat(names("Kept the Jira backlog refined")).containsExactly("Jira", "Backlog management");
+        assertThat(names("Groomed the backlog every sprint")).containsExactly("Backlog management");
+        assertThat(names("Completed a fit-gap analysis")).containsExactly("Gap analysis");
+        assertThat(names("Documented processes with swimlane diagrams")).containsExactly("Process mapping");
+        assertThat(names("Sequence diagrams for the claims API")).containsExactly("UML");
+        assertThat(names("Streamlined processes for month-end close")).containsExactly("Business process improvement");
+        assertThat(names("Analysed data and built dashboards")).containsExactly("Data analysis", "Data visualization");
+        assertThat(names("Data preparation and hypothesis testing")).containsExactly("Data cleaning", "Statistics");
+        assertThat(names("Presented findings to the board")).containsExactly("Presentation skills");
+    }
+
+    @Test
+    void variantsStayStrictEnoughThatUnrelatedTextDoesNotCount() {
+        assertThat(names("Translate functional requirements into technical designs")).isEmpty();
+        assertThat(names("A culture of continuous improvement")).isEmpty();
+        assertThat(names("Monitor service dashboards and the deployment process")).isEmpty();
+        assertThat(names("The stakeholders are our customers")).isEmpty();
+        assertThat(names("Our product has a long backlog of ideas")).isEmpty();
     }
 
     @Test

@@ -23,8 +23,8 @@ import java.util.regex.Pattern;
  * Picks the important non-skill words of a job description (e.g. "payments", "scalable", "latency")
  * and checks which ones the resume uses.
  *
- * <p>Words are lowercased and lightly normalised so "services" matches "service" and
- * "technologies" matches "technology". Skill names are removed first (they're scored separately),
+ * <p>Words are compared by their base form ({@link Stemmer}), so "process", "processes" and
+ * "processing" are one keyword, as are "document", "documented" and "documentation". Skill names are removed first (they're scored separately),
  * as are stop words (resources/analysis/stopwords.txt) and words the posting only ever writes
  * Capitalized (company names, bullet-opening verbs). The most frequent words win; ties go to the
  * word that appears first.
@@ -41,10 +41,13 @@ public class KeywordExtractor {
 
     private final SkillDictionary dictionary;
     private final Set<String> stopWords;
+    /** Stop words by stem, so "manage" also covers "managed", "managing" and "manages". */
+    private final Set<String> stopStems;
 
     public KeywordExtractor(SkillDictionary dictionary) {
         this.dictionary = dictionary;
         this.stopWords = loadStopWords();
+        this.stopStems = stopWords.stream().map(Stemmer::stem).collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     public record KeywordResult(List<String> matched, List<String> missing) {
@@ -93,7 +96,7 @@ public class KeywordExtractor {
     }
 
     private boolean isCandidate(String word) {
-        return word.length() >= MIN_LENGTH && !stopWords.contains(word) && !stopWords.contains(stem(word));
+        return word.length() >= MIN_LENGTH && !stopWords.contains(word) && !stopStems.contains(stem(word));
     }
 
     private Set<String> stems(String text) {
@@ -122,16 +125,8 @@ public class KeywordExtractor {
                 && word.codePoints().skip(1).noneMatch(Character::isUpperCase);
     }
 
-    /** Very light plural folding; good enough to match "services" with "service". */
     static String stem(String word) {
-        if (word.length() > 4 && word.endsWith("ies")) {
-            return word.substring(0, word.length() - 3) + "y";
-        }
-        if (word.length() > 3 && word.endsWith("s")
-                && !word.endsWith("ss") && !word.endsWith("us") && !word.endsWith("is")) {
-            return word.substring(0, word.length() - 1);
-        }
-        return word;
+        return Stemmer.stem(word);
     }
 
     private static Set<String> loadStopWords() {

@@ -1,6 +1,18 @@
 # syntax=docker/dockerfile:1
 
-# ---- Build stage: compile and package with the project's Maven wrapper ----
+# ---- Frontend stage: build the React app ----
+# Debian-based (not Alpine): Vite's and TypeScript's native binaries are published for glibc.
+FROM node:26-slim AS frontend
+WORKDIR /frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
+
+COPY frontend/ ./
+RUN npm run build
+
+
+# ---- Backend stage: compile and package with the project's Maven wrapper ----
 FROM eclipse-temurin:21-jdk AS build
 WORKDIR /build
 
@@ -10,6 +22,8 @@ COPY mvnw pom.xml ./
 RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -q dependency:go-offline
 
 COPY src/ src/
+# Spring Boot serves the built React app from static/ (see SpaController).
+COPY --from=frontend /frontend/dist/ src/main/resources/static/
 # Tests run in CI (they need Docker for Testcontainers), not during the image build.
 RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -q -DskipTests package \
     && cp target/resume-matcher-*.jar app.jar

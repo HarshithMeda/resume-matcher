@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -33,6 +34,11 @@ import org.springframework.security.oauth2.server.resource.web.access.BearerToke
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.header.writers.DelegatingRequestMatcherHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import tools.jackson.databind.json.JsonMapper;
 
 import javax.crypto.SecretKey;
@@ -53,6 +59,20 @@ public class SecurityConfig {
             "/error",
     };
 
+    /** The React app's built files. Public for GET only (pages themselves: SpaController.PAGES). */
+    private static final String[] STATIC_FILES = {
+            "/index.html", "/favicon.svg", "/assets/**",
+    };
+
+    /**
+     * For the React app's pages. The login token lives in localStorage, so the main risk is
+     * injected script; this only allows scripts, styles and requests from our own origin.
+     * Not applied to Swagger UI, which needs inline scripts.
+     */
+    static final String CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self'; style-src 'self';"
+            + " img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none';"
+            + " base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, JsonMapper json) throws Exception {
         AuthenticationEntryPoint unauthorized = jsonEntryPoint(json);
@@ -65,8 +85,15 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
+                .headers(headers -> headers.addHeaderWriter(new DelegatingRequestMatcherHeaderWriter(
+                        new NegatedRequestMatcher(new OrRequestMatcher(
+                                PathPatternRequestMatcher.withDefaults().matcher("/swagger-ui/**"),
+                                PathPatternRequestMatcher.withDefaults().matcher("/swagger-ui.html"))),
+                        new StaticHeadersWriter("Content-Security-Policy", CONTENT_SECURITY_POLICY))))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_PATHS).permitAll()
+                        .requestMatchers(HttpMethod.GET, SpaController.PAGES).permitAll()
+                        .requestMatchers(HttpMethod.GET, STATIC_FILES).permitAll()
                         .anyRequest().authenticated())
                 // Built-in support: reads "Authorization: Bearer <token>" and checks it with jwtDecoder().
                 .oauth2ResourceServer(oauth -> oauth

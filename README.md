@@ -2,6 +2,16 @@
 
 A Spring Boot API that compares a resume (PDF) with a job description and explains the match score.
 
+## Running locally
+
+- **Everything in Docker:** `docker compose up --build`, then open http://localhost:8080.
+  Needs a `.env` file (copy `.env.example` and fill in random values).
+- **While developing:** run the API with `./mvnw spring-boot:run` (uses `local.properties`) and the
+  frontend with `cd frontend && npm install && npm run dev`, then open http://localhost:5173.
+  The Vite dev server forwards `/api` to the API on port 8080.
+- **Tests:** `./mvnw verify` (needs Docker for the PostgreSQL test containers) and
+  `cd frontend && npm test`.
+
 ## Known limitations
 
 - **Keyword matching can match names.** The keyword part of the score (10%) compares words from the

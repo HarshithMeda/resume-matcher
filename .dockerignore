@@ -15,3 +15,8 @@ local.properties
 .vscode
 *.iml
 HELP.md
+
+# Frontend: dependencies are installed and the app is built inside the image
+frontend/node_modules
+frontend/dist
+frontend/coverage

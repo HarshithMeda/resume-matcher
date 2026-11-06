@@ -20,8 +20,8 @@ class SkillDictionaryTest {
     }
 
     @Test
-    void loadsAboutOneHundredFiftySkillsWithValidCategories() {
-        assertThat(DICT.size()).isBetween(140, 200);
+    void loadsTheDictionaryWithValidCategories() {
+        assertThat(DICT.size()).isBetween(200, 260);
         assertThat(DICT.all()).allSatisfy(s -> assertThat(SkillDictionary.CATEGORIES).contains(s.category()));
     }
 
@@ -165,6 +165,75 @@ class SkillDictionaryTest {
 
     private static java.io.InputStream stream(String s) {
         return new java.io.ByteArrayInputStream(s.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    // ---- business analysis, analytics, product, certifications, soft skills ----
+
+    @Test
+    void excelTheProductButNotTheVerb() {
+        assertThat(names("Advanced Excel and SQL")).containsExactly("Excel", "SQL");
+        assertThat(names("Proficient in Microsoft Excel")).containsExactly("Excel");
+        assertThat(names("Excellent Excel skills")).containsExactly("Excel");
+        assertThat(names("Built models in EXCEL.")).containsExactly("Excel");
+        // The verb, in any position or case, is not the product.
+        assertThat(names("You will excel at turning data into decisions.")).isEmpty();
+        assertThat(names("Excel at stakeholder management")).containsExactly("Stakeholder management");
+        assertThat(names("People who Excel in ambiguity thrive here")).isEmpty();
+        assertThat(names("Our teams excel and grow together, delivering excellent results")).isEmpty();
+    }
+
+    @Test
+    void businessAnalysisSkillsAndAliases() {
+        assertThat(names("Requirements elicitation workshops")).containsExactly("Requirements gathering");
+        assertThat(names("Wrote user stories with acceptance criteria")).containsExactly("User stories", "Acceptance criteria");
+        assertThat(names("Coordinated user acceptance testing (UAT)")).containsExactly("UAT");
+        assertThat(names("As-is and to-be process maps in BPMN 2.0")).containsExactly("Process mapping", "BPMN");
+        assertThat(names("Gap analysis and process improvement")).containsExactly("Gap analysis", "Business process improvement");
+        assertThat(names("UML diagrams and use case modelling")).containsExactly("UML", "Use case modeling");
+        assertThat(names("Certified Business Analysis Professional (CBAP); ECBA; PMP"))
+                .containsExactly("CBAP", "ECBA", "PMP");
+    }
+
+    @Test
+    void everydayPhrasesAreNotSkills() {
+        // "use cases" alone is everyday product talk; only BA forms like "writing use cases" count.
+        assertThat(names("Explore new AI use cases with customers")).isEmpty();
+        assertThat(names("Writing use cases for the claims system")).containsExactly("Use case modeling");
+        // Soft skills only when explicitly named.
+        assertThat(names("Report to the leadership team on our communication tools")).isEmpty();
+        assertThat(names("Communication, leadership and presentation are part of every job")).isEmpty();
+        assertThat(names("Build the presentation layer in React")).containsExactly("React");
+        assertThat(names("Excellent written and verbal communication skills")).containsExactly("Communication skills");
+        assertThat(names("Strong problem-solving and leadership skills")).containsExactly("Problem-solving skills", "Leadership skills");
+        assertThat(names("Comfortable presenting to senior stakeholders")).containsExactly("Presentation skills");
+        // "stakeholder communication" is its own skill, not the soft skill.
+        assertThat(names("Stakeholder communication")).containsExactly("Stakeholder communication");
+    }
+
+    @Test
+    void analyticsAndProductSkills() {
+        assertThat(names("Dashboards in Power BI, Tableau and Looker"))
+                .containsExactly("Power BI", "Tableau", "Looker");
+        assertThat(names("Data visualisation, statistical analysis and A/B tests"))
+                .containsExactly("Data visualization", "Statistics", "A/B testing");
+        assertThat(names("Data cleansing with pandas")).containsExactly("Data cleaning", "Pandas");
+        assertThat(names("Pivot tables and VLOOKUPs")).containsExactly("Pivot tables", "VLOOKUP");
+        assertThat(names("Own the product roadmap, write PRDs and run backlog refinement"))
+                .containsExactly("Roadmapping", "Product requirements documents", "Backlog management");
+        assertThat(names("Jira and Confluence in a Scrum team")).containsExactly("Jira", "Confluence", "Scrum");
+    }
+
+    @Test
+    void businessAndDataImplications() {
+        assertThat(implied("VLOOKUP")).containsExactly(Map.entry("Excel", "VLOOKUP"));
+        assertThat(implied("Pivot tables")).containsExactly(Map.entry("Excel", "Pivot tables"));
+        assertThat(implied("Power BI")).containsExactly(Map.entry("Data visualization", "Power BI"));
+        assertThat(implied("A/B testing")).containsExactly(Map.entry("Statistics", "A/B testing"));
+        assertThat(implied("BPMN")).containsExactly(Map.entry("Process mapping", "BPMN"));
+        assertThat(implied("User stories")).containsExactly(Map.entry("Agile", "User stories"));
+        assertThat(implied("Stakeholder management"))
+                .containsExactly(Map.entry("Stakeholder communication", "Stakeholder management"));
+        assertThat(implied("pandas")).containsOnlyKeys("Python", "Data analysis");
     }
 
     @Test

@@ -25,8 +25,9 @@ import java.util.regex.Pattern;
  *
  * <p>Words are lowercased and lightly normalised so "services" matches "service" and
  * "technologies" matches "technology". Skill names are removed first (they're scored separately),
- * as are stop words (resources/analysis/stopwords.txt). The most frequent words win; ties go to
- * the word that appears first.
+ * as are stop words (resources/analysis/stopwords.txt) and words the posting only ever writes
+ * Capitalized (company names, bullet-opening verbs). The most frequent words win; ties go to the
+ * word that appears first.
  */
 @Component
 public class KeywordExtractor {
@@ -64,20 +65,27 @@ public class KeywordExtractor {
 
     /** Top keywords of the job description, most important first. */
     public List<String> keywords(String jobDescription) {
-        record Count(String word, int firstIndex, int count) {
+        record Count(String word, int firstIndex, int count, boolean onlyCapitalized) {
         }
         Map<String, Count> byStem = new LinkedHashMap<>();
         int index = 0;
-        for (String word : words(dictionary.removeSkills(jobDescription))) {
+        Matcher m = WORD.matcher(EMAIL_OR_URL.matcher(dictionary.removeSkills(jobDescription)).replaceAll(" "));
+        while (m.find()) {
+            String original = m.group();
+            String word = original.toLowerCase(Locale.ROOT);
             if (isCandidate(word)) {
-                String stem = stem(word);
+                boolean capitalized = isCapitalized(original);
                 int i = index;
-                byStem.merge(stem, new Count(word, i, 1),
-                        (old, now) -> new Count(old.word(), old.firstIndex(), old.count() + 1));
+                byStem.merge(stem(word), new Count(word, i, 1, capitalized),
+                        (old, now) -> new Count(old.word(), old.firstIndex(), old.count() + 1,
+                                old.onlyCapitalized() && now.onlyCapitalized()));
             }
             index++;
         }
         return byStem.values().stream()
+                // A word the posting only ever writes Capitalized is usually a name ("Example Health
+                // Partners") or a bullet-opening verb ("Lead ..."), not wording worth copying.
+                .filter(c -> !c.onlyCapitalized())
                 .sorted(Comparator.comparingInt(Count::count).reversed().thenComparingInt(Count::firstIndex))
                 .limit(MAX_KEYWORDS)
                 .map(Count::word)
@@ -105,6 +113,13 @@ public class KeywordExtractor {
             words.add(m.group());
         }
         return words;
+    }
+
+    /** "Clinic" yes; "clinic" and acronyms like "HIPAA" no (acronyms are often real requirements). */
+    static boolean isCapitalized(String word) {
+        return word.length() > 1
+                && Character.isUpperCase(word.codePointAt(0))
+                && word.codePoints().skip(1).noneMatch(Character::isUpperCase);
     }
 
     /** Very light plural folding; good enough to match "services" with "service". */

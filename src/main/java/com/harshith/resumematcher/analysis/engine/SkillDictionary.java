@@ -29,8 +29,11 @@ import java.util.stream.Collectors;
  *   <li>a match can't be followed by a letter, digit, "_", "+", "#" or ".letter"
  *       ("Java" doesn't match "JavaScript", "C" doesn't match "C++" or "C#");</li>
  *   <li>1-2 character names (C, R, Go, C#) also can't touch "-", "&amp;" or "'"
- *       ("C-level", "R&amp;D", "Go-to-market", "Objective-C").</li>
+ *       ("C-level", "R&amp;D", "Go-to-market", "Objective-C");</li>
+ *   <li>a skill can list words that cancel a match right after it ("Excel at", "Excel in").</li>
  * </ul>
+ * Names that are everyday words (Go, React, Excel) only match with their usual capitalisation, and
+ * soft skills only match explicit phrases ("communication skills", not just "communication").
  */
 @Component
 public class SkillDictionary {
@@ -38,7 +41,8 @@ public class SkillDictionary {
     static final String RESOURCE = "/analysis/skills.json";
     static final Set<String> CATEGORIES = Set.of(
             "language", "framework", "database", "cloud", "devops",
-            "messaging", "tool", "testing", "practice", "data");
+            "messaging", "tool", "testing", "practice", "data",
+            "business-analysis", "analytics", "product-management", "certification", "soft-skill");
 
     private static final String BEFORE = "(?<![\\p{L}\\p{N}_.])";
     private static final String AFTER = "(?![\\p{L}\\p{N}_+#])(?!\\.[\\p{L}\\p{N}])";
@@ -142,7 +146,7 @@ public class SkillDictionary {
     }
 
     record SkillDefinition(String name, String category, List<String> aliases, List<String> caseSensitive,
-                           List<String> implies) {
+                           List<String> implies, List<String> notFollowedBy) {
     }
 
     private record CompiledSkill(Skill skill, Pattern pattern) {
@@ -220,8 +224,9 @@ public class SkillDictionary {
             // Longest first: regex takes the first alternative that matches, and we want the whole
             // mention ("Tailwind CSS", not just "Tailwind") so shorter skills inside it are ignored.
             forms.sort(Comparator.comparingInt((Form f) -> f.alias().length()).reversed());
+            String notFollowedBy = notFollowedBy(d);
             Pattern pattern = Pattern.compile(forms.stream()
-                    .map(f -> aliasRegex(f.alias(), f.ignoreCase()))
+                    .map(f -> aliasRegex(f.alias(), f.ignoreCase()) + notFollowedBy)
                     .collect(Collectors.joining("|")));
             compiled.add(new CompiledSkill(new Skill(d.name(), d.category()), pattern));
         }
@@ -235,6 +240,21 @@ public class SkillDictionary {
         if (previous != null && !previous.equals(skill)) {
             throw new IllegalStateException("Alias '" + alias + "' is used by both " + previous + " and " + skill);
         }
+    }
+
+    /**
+     * Words that cancel a match when they come right after it, so a skill name that is also an
+     * everyday verb isn't counted: Excel the product, but not "Excel at" or "Excel in".
+     */
+    private static String notFollowedBy(SkillDefinition d) {
+        if (d.notFollowedBy() == null || d.notFollowedBy().isEmpty()) {
+            return "";
+        }
+        String words = d.notFollowedBy().stream()
+                .map(w -> java.util.Arrays.stream(w.strip().split("\\s+")).map(Pattern::quote)
+                        .collect(Collectors.joining("\\s+")))
+                .collect(Collectors.joining("|"));
+        return "(?!\\s+(?iu:" + words + ")(?![\\p{L}\\p{N}]))";
     }
 
     private static String aliasRegex(String alias, boolean ignoreCase) {

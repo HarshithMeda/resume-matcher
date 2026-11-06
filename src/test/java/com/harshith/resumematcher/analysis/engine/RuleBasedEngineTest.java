@@ -44,7 +44,7 @@ class RuleBasedEngineTest {
         List<String> tips = TIPS.suggest(RESUME, JOB, r);
         assertThat(tips).hasSizeBetween(3, 5);
         assertThat(tips.getFirst()).startsWith("If you've used Docker, add it to your skills section");
-        assertThat(tips).anyMatch(t -> t.contains("Apache Kafka") && t.contains("If you have experience"));
+        assertThat(tips).anyMatch(t -> t.contains("Apache Kafka") && t.contains("If you have any of them, mention it"));
     }
 
     // ---- skill groups ----
@@ -141,6 +141,33 @@ class RuleBasedEngineTest {
     }
 
     @Test
+    void namesInThePostingAreNotKeywordsButAcronymsAndRealWordsAre() {
+        KeywordExtractor kw = new KeywordExtractor(DICT);
+        List<String> keywords = kw.keywords("""
+                Business Analyst - Example Health Partners
+                Lead workshops with clinics on patient scheduling. Build HIPAA-compliant reports for business users.
+                """);
+        assertThat(keywords).doesNotContain("example", "health", "partners", "lead", "analyst");
+        assertThat(keywords).contains("business", "workshops", "clinics", "patient", "scheduling", "hipaa");
+    }
+
+    @Test
+    void softSkillsAndCertificationsGetTheirOwnGroupedTips() {
+        String job = """
+                Requirements:
+                - SQL, Tableau and Jira
+                - Excellent communication skills and strong problem-solving skills
+                - CBAP or PMP certification required
+                """;
+        List<String> tips = TIPS.suggest("Analyst", job, ANALYZER.analyze("Analyst", job));
+        assertThat(tips).contains(
+                "The job asks for communication skills and problem-solving skills. Where they describe you, show them"
+                        + " with concrete examples in your role bullets rather than only listing the words.",
+                "The job asks for CBAP or PMP certification. If you hold one, list it in a Certifications section.");
+        assertThat(tips).noneMatch(t -> t.contains("learning the basics") && t.contains("communication"));
+    }
+
+    @Test
     void emailsAndLinksDoNotCountAsKeywordMatches() {
         KeywordExtractor kw = new KeywordExtractor(DICT);
         KeywordExtractor.KeywordResult r = kw.compare(
@@ -155,6 +182,42 @@ class RuleBasedEngineTest {
         MatchResult r = ANALYZER.analyze("Java developer", "Requirements: Java and microservices experience.");
         List<String> tips = TIPS.suggest("Java developer", "", r);
         assertThat(tips.getFirst()).startsWith("If you've worked with Microservices,");
+    }
+
+    @Test
+    void certificationAndSoftSkillTipsFitTheKindOfSkill() {
+        assertThat(RuleBasedSuggestionProvider.missingSkillTip(new MissingSkill("CBAP", "certification", null)))
+                .isEqualTo("If you hold the CBAP certification, list it in a Certifications section. If you don't, leave it out.");
+        assertThat(RuleBasedSuggestionProvider.missingSkillTip(new MissingSkill("Communication skills", "soft-skill", null)))
+                .startsWith("The job asks for communication skills. If that describes you, show it with a concrete example");
+        assertThat(RuleBasedSuggestionProvider.missingSkillTip(new MissingSkill("Gap analysis", "business-analysis", null)))
+                .startsWith("If you've worked with Gap analysis, add it to your skills section");
+        assertThat(RuleBasedSuggestionProvider.missingSkillTip(new MissingSkill("Docker", "devops", null)))
+                .startsWith("If you've used Docker, add it to your skills section");
+    }
+
+    @Test
+    void businessAnalystJobEndToEnd() {
+        String resume = "Business analyst. Gathered requirements in workshops, wrote user stories with acceptance"
+                + " criteria, built pivot tables and Power BI dashboards. Excellent communication skills.";
+        String job = """
+                Requirements:
+                - Requirements gathering and user stories
+                - Advanced Excel and data visualization
+                - Strong communication skills
+                Nice to have:
+                - CBAP certification
+                You will excel at working with stakeholders.
+                """;
+        MatchResult r = ANALYZER.analyze(resume, job);
+        assertThat(r.matchedSkills()).extracting(MatchedSkill::name, MatchedSkill::impliedBy).contains(
+                tuple("Requirements gathering", null),
+                tuple("User stories", null),
+                tuple("Excel", "Pivot tables"),
+                tuple("Data visualization", "Power BI"),
+                tuple("Communication skills", null));
+        assertThat(r.missingRequiredSkills()).isEmpty();
+        assertThat(r.missingPreferredSkills()).extracting(MissingSkill::name).containsExactly("CBAP");
     }
 
     @Test

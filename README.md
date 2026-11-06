@@ -14,11 +14,15 @@ A Spring Boot API that compares a resume (PDF) with a job description and explai
 
 ## Known limitations
 
-- **Keyword matching can match names.** The keyword part of the score (10%) compares words from the
-  job description with every word in the resume, including the candidate's name, company names and
-  place names. For example, a candidate named "Riley Example" matches the keyword "example" in a job
-  posted by "Example Payments Co.". The effect on the score is small, but a keyword can occasionally
-  show as matched for this reason.
+- **Keyword matching can match names.** Words the job posting only ever writes Capitalized (company
+  names like "Example Health Partners", or verbs that open bullets) are skipped as keywords. But a
+  resume is compared word by word, including the candidate's name and past employers, so a keyword
+  can occasionally show as matched because of a name. It only affects the keyword part (10%).
+- **"Or" isn't understood.** "Power BI or Tableau" counts as two nice-to-have skills, so a resume
+  with only one of them shows the other as missing.
+- **Skills are found by wording.** Each skill has a list of names and common phrasings; a resume that
+  describes a skill in other words (e.g. "kept the Jira backlog refined" for backlog management) won't
+  be credited for it.
 - **Rate limits are kept in memory.** Login, sign-up and daily analysis counts reset when the app
   restarts, and each app instance counts separately. That's fine for a single instance; running
   several would need a shared store such as the database.

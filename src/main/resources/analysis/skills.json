@@ -1,5 +1,5 @@
 {
-  "_comment": "Skill dictionary. 'name' is the canonical name shown to users and is matched case-insensitively unless it is listed in 'caseSensitive'. 'aliases' are matched case-insensitively. 'caseSensitive' holds forms that are also ordinary English words or letters (Go, C, R, React...), so they only match with this exact capitalisation. Matching is whole-word: Java never matches JavaScript, C never matches C++ or C#. 'implies' (optional) lists other skills, by canonical name, that a resume showing this skill is assumed to have too; it is used on the resume side only and is not transitive.",
+  "_comment": "Skill dictionary. 'name' is the canonical name shown to users and is matched case-insensitively unless it is listed in 'caseSensitive'. 'aliases' are matched case-insensitively. 'caseSensitive' holds forms that are also ordinary English words or letters (Go, C, R, React...), so they only match with this exact capitalisation. Matching is whole-word: Java never matches JavaScript, C never matches C++ or C#. 'implies' (optional) lists other skills, by canonical name, that a resume showing this skill is assumed to have too; it is used on the resume side only and is not transitive. 'notFollowedBy' (optional) lists words that cancel a match when they come right after it, e.g. Excel is not matched in 'Excel at' or 'Excel in' (the verb).",
   "skills": [
     {"name": "Java", "category": "language", "aliases": ["java8", "java11", "java17", "java21"]},
     {"name": "Kotlin", "category": "language", "aliases": []},
@@ -184,7 +184,7 @@
     {"name": "Deep learning", "category": "data", "aliases": [], "implies": ["Machine learning"]},
     {"name": "NLP", "category": "data", "aliases": ["natural language processing"]},
     {"name": "LLMs", "category": "data", "aliases": ["llm", "large language model", "large language models"]},
-    {"name": "Pandas", "category": "data", "aliases": [], "implies": ["Python"]},
+    {"name": "Pandas", "category": "data", "aliases": [], "implies": ["Python", "Data analysis"]},
     {"name": "NumPy", "category": "data", "aliases": [], "implies": ["Python"]},
     {"name": "PyTorch", "category": "data", "aliases": [], "implies": ["Python", "Deep learning", "Machine learning"]},
     {"name": "TensorFlow", "category": "data", "aliases": [], "implies": ["Deep learning", "Machine learning"]},
@@ -193,8 +193,42 @@
     {"name": "Hadoop", "category": "data", "aliases": ["hdfs"]},
     {"name": "Apache Airflow", "category": "data", "aliases": ["airflow"]},
     {"name": "ETL", "category": "data", "aliases": []},
-    {"name": "Data analysis", "category": "data", "aliases": []},
-    {"name": "Tableau", "category": "data", "aliases": []},
-    {"name": "Power BI", "category": "data", "aliases": ["powerbi"]}
+    {"name": "Data analysis", "category": "analytics", "aliases": []},
+    {"name": "Tableau", "category": "analytics", "aliases": [], "implies": ["Data visualization"]},
+    {"name": "Power BI", "category": "analytics", "aliases": ["powerbi"], "implies": ["Data visualization"]},
+    {"name": "Requirements gathering", "category": "business-analysis", "aliases": ["requirement gathering", "gathering requirements", "gathered requirements", "gather requirements", "requirements elicitation", "elicitation of requirements", "elicit requirements", "eliciting requirements", "requirements analysis"]},
+    {"name": "User stories", "category": "business-analysis", "aliases": ["user story", "writing user stories"], "implies": ["Agile"]},
+    {"name": "Acceptance criteria", "category": "business-analysis", "aliases": ["acceptance criterion"]},
+    {"name": "Stakeholder management", "category": "business-analysis", "aliases": ["managing stakeholders", "stakeholder engagement", "stakeholder relationships"], "implies": ["Stakeholder communication"]},
+    {"name": "Process mapping", "category": "business-analysis", "aliases": ["process maps", "process map", "process modeling", "process modelling", "process flow diagrams", "as-is and to-be processes", "as-is/to-be"]},
+    {"name": "Gap analysis", "category": "business-analysis", "aliases": ["gap analyses"]},
+    {"name": "UAT", "category": "business-analysis", "aliases": ["user acceptance testing", "user acceptance tests", "user acceptance test"]},
+    {"name": "BPMN", "category": "business-analysis", "aliases": ["business process model and notation", "bpmn 2.0"], "implies": ["Process mapping"]},
+    {"name": "UML", "category": "business-analysis", "aliases": ["unified modeling language", "uml diagrams"]},
+    {"name": "Use case modeling", "category": "business-analysis", "aliases": ["use case diagrams", "use case diagram", "use case modelling", "writing use cases", "use case specifications", "use case documentation"]},
+    {"name": "Business process improvement", "category": "business-analysis", "aliases": ["process improvement", "process improvements", "process optimization", "process optimisation", "business process optimization", "business process re-engineering", "business process reengineering", "bpr"]},
+
+    {"name": "CBAP", "category": "certification", "aliases": ["certified business analysis professional"]},
+    {"name": "ECBA", "category": "certification", "aliases": ["entry certificate in business analysis"]},
+    {"name": "PMP", "category": "certification", "aliases": ["project management professional"]},
+
+    {"name": "Excel", "category": "analytics", "aliases": ["microsoft excel", "ms excel", "advanced excel", "excel spreadsheets", "excel vba", "excel formulas", "excel modeling", "excel modelling"], "caseSensitive": ["Excel", "EXCEL"], "notFollowedBy": ["at", "in", "as", "with", "on", "when", "within", "under", "beyond", "across", "by", "through", "and grow", "and thrive"]},
+    {"name": "Pivot tables", "category": "analytics", "aliases": ["pivot table", "pivottables", "pivottable", "pivot charts"], "implies": ["Excel"]},
+    {"name": "VLOOKUP", "category": "analytics", "aliases": ["vlookups", "xlookup", "v-lookup"], "implies": ["Excel"]},
+    {"name": "Looker", "category": "analytics", "aliases": ["lookml"], "implies": ["Data visualization"]},
+    {"name": "Data visualization", "category": "analytics", "aliases": ["data visualisation", "data visualizations", "data visualisations", "data viz", "dashboarding", "dashboard development", "building dashboards", "build dashboards", "creating dashboards"]},
+    {"name": "Statistics", "category": "analytics", "aliases": ["statistical analysis", "statistical methods", "statistical modeling", "statistical modelling", "statistical techniques"]},
+    {"name": "A/B testing", "category": "analytics", "aliases": ["a/b tests", "a/b test", "ab testing", "split testing", "a/b experiments"], "implies": ["Statistics"]},
+    {"name": "Data cleaning", "category": "analytics", "aliases": ["data cleansing", "data wrangling", "cleaning data", "data scrubbing", "data quality checks"]},
+
+    {"name": "Roadmapping", "category": "product-management", "aliases": ["product roadmap", "product roadmaps", "roadmap planning", "road mapping", "roadmapping"]},
+    {"name": "Product requirements documents", "category": "product-management", "aliases": ["product requirements document", "product requirement documents", "prd", "prds"]},
+    {"name": "Backlog management", "category": "product-management", "aliases": ["backlog grooming", "backlog refinement", "backlog prioritization", "backlog prioritisation", "managing the backlog", "product backlog"]},
+    {"name": "Stakeholder communication", "category": "product-management", "aliases": ["communicating with stakeholders", "communicate with stakeholders", "stakeholder updates", "stakeholder reporting"]},
+
+    {"name": "Communication skills", "category": "soft-skill", "aliases": ["written communication", "verbal communication", "written and verbal communication", "verbal and written communication", "oral and written communication", "strong communicator", "excellent communicator", "effective communicator"]},
+    {"name": "Presentation skills", "category": "soft-skill", "aliases": ["public speaking", "presenting findings", "presenting to stakeholders", "presenting to senior stakeholders", "delivering presentations", "giving presentations"]},
+    {"name": "Leadership skills", "category": "soft-skill", "aliases": ["leadership experience", "team leadership", "people leadership", "technical leadership", "leading teams", "lead a team", "led a team", "leading a team"]},
+    {"name": "Problem-solving skills", "category": "soft-skill", "aliases": ["problem solving", "problem-solving", "problem solving skills", "problem solver", "problem-solver", "solving complex problems", "analytical problem solving"]}
   ]
 }

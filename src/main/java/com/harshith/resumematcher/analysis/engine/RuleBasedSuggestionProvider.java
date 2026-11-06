@@ -22,6 +22,26 @@ public class RuleBasedSuggestionProvider implements SuggestionProvider {
         return "rule-based-v1";
     }
 
+    /** Categories whose skills are things you use: "If you've used Docker". */
+    private static final java.util.Set<String> TOOL_CATEGORIES = java.util.Set.of(
+            "language", "framework", "database", "cloud", "devops", "messaging", "tool", "testing");
+
+    /** Wording that fits the kind of skill. Every version is conditional: never a claim. */
+    static String missingSkillTip(MissingSkill skill) {
+        return switch (skill.category()) {
+            case "certification" -> "If you hold the " + skill.label() + " certification, list it in a"
+                    + " Certifications section. If you don't, leave it out.";
+            // Soft-skill names end in "skills": "The job asks for communication skills."
+            case "soft-skill" -> "The job asks for " + skill.name().toLowerCase(java.util.Locale.ROOT)
+                    + ". If that describes you, show it with a concrete example in a role bullet"
+                    + " rather than only listing the word.";
+            // For a group the label lists its items: "If you've used AWS (Amazon EC2, Amazon S3 or Amazon RDS)".
+            default -> (TOOL_CATEGORIES.contains(skill.category()) ? "If you've used " : "If you've worked with ")
+                    + skill.label() + ", add it to your skills section and mention where you applied it in a"
+                    + " project or role. If you haven't, leave it out.";
+        };
+    }
+
     @Override
     public List<String> suggest(String resumeText, String jobDescription, MatchResult result) {
         List<String> tips = new ArrayList<>();
@@ -30,26 +50,44 @@ public class RuleBasedSuggestionProvider implements SuggestionProvider {
         List<String> missingPreferred = result.missingPreferredSkills().stream().map(MissingSkill::name).toList();
 
         // 1. Missing required skills: the biggest lever on the score.
-        for (MissingSkill skill : missingRequiredSkills.subList(0, Math.min(MAX_SINGLE_SKILL_TIPS, missingRequired.size()))) {
-            // "used Docker" reads well for tools; "worked with microservices" for practices.
-            String verb = skill.category().equals("practice") ? "worked with " : "used ";
-            // For a group the label lists its items: "If you've used AWS (Amazon EC2, Amazon S3 or Amazon RDS)".
-            tips.add("If you've " + verb + skill.label() + ", add it to your skills section and mention where"
-                    + " you applied it in a project or role. If you haven't, leave it out.");
+        //    Soft skills and certifications need different advice, so they're handled separately.
+        List<MissingSkill> hard = missingRequiredSkills.stream()
+                .filter(s -> !s.category().equals("soft-skill") && !s.category().equals("certification")).toList();
+        List<MissingSkill> soft = missingRequiredSkills.stream()
+                .filter(s -> s.category().equals("soft-skill")).toList();
+        List<MissingSkill> certs = missingRequiredSkills.stream()
+                .filter(s -> s.category().equals("certification")).toList();
+
+        for (MissingSkill skill : hard.subList(0, Math.min(MAX_SINGLE_SKILL_TIPS, hard.size()))) {
+            tips.add(missingSkillTip(skill));
         }
-        if (missingRequired.size() > MAX_SINGLE_SKILL_TIPS) {
-            List<String> rest = missingRequired.subList(MAX_SINGLE_SKILL_TIPS, missingRequired.size());
+        if (hard.size() > MAX_SINGLE_SKILL_TIPS) {
+            List<String> rest = hard.subList(MAX_SINGLE_SKILL_TIPS, hard.size()).stream().map(MissingSkill::name).toList();
             tips.add(rest.size() == 1
                     ? "The job also requires " + rest.getFirst() + ". Add it only if you've worked with it;"
                             + " if not, consider learning the basics before applying."
                     : "The job also requires " + Text.joinNames(rest, 4) + ". Add only the ones you've"
                             + " worked with; for the others, consider learning the basics before applying.");
         }
+        if (soft.size() == 1) {
+            tips.add(missingSkillTip(soft.getFirst()));
+        } else if (soft.size() > 1) {
+            List<String> names = soft.stream().map(s -> s.name().toLowerCase(java.util.Locale.ROOT)).toList();
+            tips.add("The job asks for " + Text.joinNames(names, 4) + ". Where they describe you, show them"
+                    + " with concrete examples in your role bullets rather than only listing the words.");
+        }
+        if (certs.size() == 1) {
+            tips.add(missingSkillTip(certs.getFirst()));
+        } else if (certs.size() > 1) {
+            List<String> names = certs.stream().map(MissingSkill::name).toList();
+            tips.add("The job asks for " + Text.joinNames(names, 4).replace(" and ", " or ") + " certification."
+                    + " If you hold one, list it in a Certifications section.");
+        }
 
         // 2. Missing preferred skills.
         if (!missingPreferred.isEmpty()) {
             tips.add("The job lists " + Text.joinNames(missingPreferred, 3) + " as nice to have. If you have"
-                    + " experience with any of them, mention it; it's fine to leave out ones you haven't used.");
+                    + " any of them, mention it; it's fine to leave out the rest.");
         }
 
         // 3. Wording from the posting.

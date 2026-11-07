@@ -18,21 +18,23 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final ClientIpResolver clientIp;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, ClientIpResolver clientIp) {
         this.authService = authService;
+        this.clientIp = clientIp;
     }
 
     @Operation(summary = "Create an account (max 5 per IP address per hour)")
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponse register(@Valid @RequestBody RegisterRequest request, HttpServletRequest http) {
-        return UserResponse.from(authService.register(request, ClientIp.of(http)));
+        return UserResponse.from(authService.register(request, clientIp.resolve(http)));
     }
 
     @Operation(summary = "Log in and get a JWT (valid for 60 minutes). Too many failures return 429.")
     @PostMapping("/login")
     public TokenResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
-        return authService.login(request, ClientIp.of(http));
+        return authService.login(request, clientIp.resolve(http));
     }
 }

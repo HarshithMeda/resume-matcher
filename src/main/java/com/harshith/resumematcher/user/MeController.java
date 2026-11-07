@@ -1,6 +1,6 @@
 package com.harshith.resumematcher.user;
 
-import com.harshith.resumematcher.auth.ClientIp;
+import com.harshith.resumematcher.auth.ClientIpResolver;
 import com.harshith.resumematcher.auth.CurrentUser;
 import com.harshith.resumematcher.error.ApiException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,10 +26,12 @@ public class MeController {
 
     private final UserRepository users;
     private final AccountService accounts;
+    private final ClientIpResolver clientIp;
 
-    public MeController(UserRepository users, AccountService accounts) {
+    public MeController(UserRepository users, AccountService accounts, ClientIpResolver clientIp) {
         this.users = users;
         this.accounts = accounts;
+        this.clientIp = clientIp;
     }
 
     @Operation(summary = "The currently logged-in user")
@@ -46,7 +48,7 @@ public class MeController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DeleteAccountRequest request,
                        HttpServletRequest http) {
-        accounts.deleteAccount(CurrentUser.id(jwt), request.password(), ClientIp.of(http));
+        accounts.deleteAccount(CurrentUser.id(jwt), request.password(), clientIp.resolve(http));
     }
 
     @Operation(summary = "Download all your data as JSON")

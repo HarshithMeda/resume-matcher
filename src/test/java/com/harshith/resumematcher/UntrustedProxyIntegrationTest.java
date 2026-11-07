@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * the per-IP limits by sending a fake header.
  */
 @IntegrationTest
-@TestPropertySource(properties = "server.tomcat.remoteip.internal-proxies=10.255.255.1/32")
+@TestPropertySource(properties = "app.client-ip.trusted-proxies=10.255.255.1/32")
 class UntrustedProxyIntegrationTest extends ApiTestSupport {
 
     @Test

@@ -12,6 +12,33 @@ A Spring Boot API that compares a resume (PDF) with a job description and explai
 - **Tests:** `./mvnw verify` (needs Docker for the PostgreSQL test containers) and
   `cd frontend && npm test`.
 
+## Deploying to Render (free plan) with Neon
+
+Create a **Web Service** from this repository with the **Docker** runtime (the `Dockerfile` builds
+the frontend and the API into one image and runs the `prod` profile).
+
+**Health check path:** `/actuator/health/liveness`
+(it doesn't touch the database, so a sleeping Neon database isn't woken every few seconds, and a slow
+database wake-up doesn't make Render restart the app; `/actuator/health` still includes the database).
+
+**Environment variables:**
+
+| Variable | What to put in it |
+|---|---|
+| `SPRING_DATASOURCE_URL` | Neon's **direct** (not "pooled") connection as a JDBC URL: `jdbc:postgresql://<endpoint-host>/<database>?sslmode=require` |
+| `SPRING_DATASOURCE_USERNAME` | The Neon role (database user) |
+| `SPRING_DATASOURCE_PASSWORD` | That role's password |
+| `APP_JWT_SECRET` | A long random string, at least 32 characters (e.g. `openssl rand -hex 32`). Changing it logs everyone out. |
+| `SWAGGER_ENABLED` | Optional. `true` turns Swagger UI and `/v3/api-docs` on; leave unset in production. |
+
+Don't set `PORT` (Render sets it; the app listens on whatever it says) or `SPRING_PROFILES_ACTIVE`
+(the image already uses `prod`). Use Neon's direct host rather than the pooled one: Flyway migrations
+need a regular session, and the app only opens up to 5 connections anyway.
+
+Expect a slow first request after the free instance has been idle for 15 minutes: the instance
+wakes up and Java starts on a small slice of CPU (about 75 seconds when measured locally at 0.1 CPU),
+and Neon may also need a moment to wake.
+
 ## Known limitations
 
 - **Keyword matching can match names.** Words the job posting only ever writes Capitalized (company
@@ -36,7 +63,11 @@ A Spring Boot API that compares a resume (PDF) with a job description and explai
 - **Rate limits are kept in memory.** Login, sign-up and daily analysis counts reset when the app
   restarts, and each app instance counts separately. That's fine for a single instance; running
   several would need a shared store such as the database.
-- **Behind a proxy, the trusted proxy range must be set.** Client IPs come from `X-Forwarded-For` only
-  when the request arrives from an address in `server.tomcat.remoteip.internal-proxies` (loopback by
-  default). On Render, set the `SERVER_TOMCAT_REMOTEIP_INTERNALPROXIES` environment variable to the
-  range Render's proxy connects from; otherwise every user shares the proxy's IP for the per-IP limits.
+- **Client IPs on Render depend on Render's proxy setup.** Render doesn't document its headers. Based
+  on Cloudflare's documentation (it appends the address that connected to it) and observed Render
+  headers, the app reads `X-Forwarded-For` only from Render's private network and Cloudflare's
+  published ranges, and skips at most two proxy hops from the right, so a client can't choose their
+  own IP. If Render changes its proxy chain or Cloudflare adds ranges, the per-IP limits could end up
+  shared by many users (too strict) until the lists in `application-prod.properties` are updated;
+  the log line starting "Client IP:" after the first request shows whether the header looks as expected.
+  Several people behind one network address (an office, a mobile carrier) also share one limit.

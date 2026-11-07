@@ -31,6 +31,8 @@ services:
       SPRING_DATASOURCE_USERNAME: resumematcher_user
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       APP_JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      # The image runs the production profile, where Swagger UI is off; set SWAGGER_ENABLED=true in .env to see it.
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
     ports:
       - "8080:8080"
     mem_limit: 512m
